@@ -6,11 +6,13 @@ import ast
 
 from analyzer.reporter import Finding
 from analyzer.rules.base import Rule
+from analyzer.rules.dead_code import DeadCodeRule
+from analyzer.rules.division_by_zero import DivisionByZeroRule
 from analyzer.rules.unused_variable import UnusedVariableRule
 
 
 def default_rules() -> list[Rule]:
-    return [UnusedVariableRule()]
+    return [UnusedVariableRule(), DeadCodeRule(), DivisionByZeroRule()]
 
 
 def analyze(tree: ast.Module, rules: list[Rule] | None = None) -> list[Finding]:
