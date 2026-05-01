@@ -24,7 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     try:
-        tree = parse_file(args.path)
+        tree, source = parse_file(args.path)
     except FileNotFoundError:
         print(f"analyzer: file not found: {args.path}", file=sys.stderr)
         return 2
@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     findings = analyze(tree)
-    print(render(findings))
+    print(render(findings, source))
     return 1 if findings else 0
 
 

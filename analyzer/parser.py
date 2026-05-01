@@ -4,9 +4,11 @@ import ast
 from pathlib import Path
 
 
-def parse_file(path: str | Path) -> ast.Module:
+def parse_file(path: str | Path) -> tuple[ast.Module, str]:
+    """Parse a file and return (tree, source_code)."""
     source = Path(path).read_text(encoding="utf-8")
-    return ast.parse(source, filename=str(path))
+    tree = ast.parse(source, filename=str(path))
+    return tree, source
 
 
 def dump_tree(tree: ast.AST, indent: int = 2) -> str:

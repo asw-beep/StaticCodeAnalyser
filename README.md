@@ -60,9 +60,20 @@ python -m analyzer path/to/file.py
 ```bash
 $ analyzer examples/kitchen_sink.py
 [WARNING] Unused variable 'unused' at line 5 (unused-variable)
+  4 | def buggy(x):
+  5 |     unused = 99  <-- HERE
+  6 |     z = 0
 [ERROR] Division by zero ('/' by 'z', always 0) at line 7 (division-by-zero)
+  6 |     z = 0
+  7 |     result = x / z  <-- HERE
+  8 |     return result
 [WARNING] Unreachable code after 'return' at line 9 (dead-code)
+  8 |     return result
+  9 |     print("never runs")  <-- HERE
+  10 | 
 [INFO] Possible division by zero ('/' with non-constant divisor) at line 13 (division-by-zero)
+  12 | def maybe(x, divisor):
+  13 |     return x / divisor  <-- HERE
 ```
 
 ## Project layout
