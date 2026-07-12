@@ -14,3 +14,11 @@ analyzer = "analyzer.cli:main"
 [tool.setuptools.packages.find]
 include = ["analyzer*"]
 exclude = ["tests*", "examples*", "docs*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = ["examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

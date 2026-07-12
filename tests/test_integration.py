@@ -48,6 +48,9 @@ def test_kitchen_sink_triggers_all_rules(capsys):
     assert "(unused-variable)" in out
     assert "(dead-code)" in out
     assert "(division-by-zero)" in out
+    assert "(unsafe-execution)" in out
+    assert "(hardcoded-secrets)" in out
+    assert "(sql-injection)" in out
 
 
 def test_findings_sorted_by_line(capsys):
