@@ -4,7 +4,10 @@ Inspects every binary op whose operator divides (`/`, `//`, `%`) and checks
 the right operand:
 
 - Literal `0` / `0.0` -> ERROR (definite)
-- Name we can prove was last assigned a literal `0` in the same scope -> ERROR
+- Name whose EVERY binding in the same scope is a literal `0` -> ERROR.
+  Any other binding — `x += 1`, `x, y = ...`, `for x in`, `with ... as x`,
+  `x := ...`, a parameter, or a `global`/`nonlocal` declaration — means we
+  can't prove it's zero, so it drops to INFO.
 - Anything else (variable, expression, call) -> INFO (possible)
 
 The "possible" tier is deliberately quiet (INFO, not WARNING). Most divisions
@@ -15,6 +18,8 @@ Limitations (deliberate):
 - No interprocedural analysis.
 - No flow-sensitive narrowing (e.g. `if x != 0: a / x` still INFO).
 - We trace constant assignments only at the immediate scope, no aliasing.
+- Comprehension targets are counted as bindings of the enclosing scope. That
+  can only downgrade an ERROR to INFO, never create a false ERROR.
 """
 
 from __future__ import annotations
@@ -35,21 +40,71 @@ def _is_zero_literal(node: ast.expr) -> bool:
     return isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and node.value == 0
 
 
-def _collect_constant_zero_names(scope_body: list[ast.stmt]) -> set[str]:
-    """Names whose ONLY assignment in this scope is a literal 0."""
-    assigns: dict[str, list[ast.expr]] = {}
-    for node in ast.walk(ast.Module(body=scope_body, type_ignores=[])):
-        if isinstance(node, ast.Assign):
-            for tgt in node.targets:
-                if isinstance(tgt, ast.Name):
-                    assigns.setdefault(tgt.id, []).append(node.value)
-    return {name for name, vals in assigns.items() if all(_is_zero_literal(v) for v in vals)}
+_SCOPE_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+
+
+def _walk_scope(body: list[ast.stmt]):
+    """Like ast.walk over `body`, but don't descend into nested scopes."""
+    stack: list[ast.AST] = list(body)
+    while stack:
+        node = stack.pop()
+        yield node
+        if isinstance(node, _SCOPE_NODES):
+            continue
+        stack.extend(ast.iter_child_nodes(node))
+
+
+def _collect_constant_zero_names(scope_body: list[ast.stmt], params: set[str]) -> set[str]:
+    """Names whose ONLY bindings in this scope are literal-0 assignments."""
+    zero_targets: set[int] = set()  # id() of Name nodes bound by `name = 0`
+    for node in _walk_scope(scope_body):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
+            if _is_zero_literal(node.value):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                zero_targets.update(id(t) for t in targets if isinstance(t, ast.Name))
+
+    zero: set[str] = set()
+    rebound: set[str] = set(params)
+    for node in _walk_scope(scope_body):
+        if isinstance(node, ast.Name) and not isinstance(node.ctx, ast.Load):
+            (zero if id(node) in zero_targets else rebound).add(node.id)
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            rebound.update(node.names)
+    return zero - rebound
+
+
+def _params(func: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    args = func.args
+    out = {a.arg for a in args.posonlyargs + args.args + args.kwonlyargs}
+    if args.vararg:
+        out.add(args.vararg.arg)
+    if args.kwarg:
+        out.add(args.kwarg.arg)
+    return out
 
 
 class _DivVisitor(ast.NodeVisitor):
     def __init__(self, zero_names: set[str]) -> None:
         self.zero_names = zero_names
         self.findings: list[Finding] = []
+        self.nested: list[ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef] = []
+
+    # Nested functions/classes are their own scope: the rule runs them
+    # separately. Decorators, defaults and bases evaluate in THIS scope.
+    def visit_FunctionDef(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        for d in node.decorator_list + node.args.defaults:
+            self.visit(d)
+        for d in node.args.kw_defaults:
+            if d is not None:
+                self.visit(d)
+        self.nested.append(node)
+
+    visit_AsyncFunctionDef = visit_FunctionDef
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        for d in node.decorator_list + node.bases:
+            self.visit(d)
+        self.nested.append(node)
 
     def visit_BinOp(self, node: ast.BinOp) -> None:
         if isinstance(node.op, _DIV_OPS):
@@ -96,16 +151,13 @@ class DivisionByZeroRule(Rule):
         # Build per-scope sets of "always zero" names. Module + each function.
         findings: list[Finding] = []
 
-        def run(body: list[ast.stmt]) -> None:
-            zero_names = _collect_constant_zero_names(body)
-            v = _DivVisitor(zero_names)
+        def run(body: list[ast.stmt], params: set[str]) -> None:
+            v = _DivVisitor(_collect_constant_zero_names(body, params))
             for stmt in body:
-                # Don't descend into nested function bodies — they're their own scope.
-                if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    run(stmt.body)
-                else:
-                    v.visit(stmt)
+                v.visit(stmt)
             findings.extend(v.findings)
+            for nested in v.nested:
+                run(nested.body, set() if isinstance(nested, ast.ClassDef) else _params(nested))
 
-        run(tree.body)
+        run(tree.body, set())
         return sorted(findings, key=lambda f: f.line)

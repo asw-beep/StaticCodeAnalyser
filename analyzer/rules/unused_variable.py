@@ -12,6 +12,9 @@ Edge cases handled:
   unused")
 - augmented assignment (`x += 1`) counts as both load and store
 - tuple/starred unpacking targets are each treated as an assignment
+- `with ... as x` and walrus (`x := ...`) targets are assignments
+- subscript/attribute targets (`d[k] = v`, `o.x = v`) are a *use* of `d`/`o`,
+  not an assignment — they mutate an existing object
 """
 
 from __future__ import annotations
@@ -53,28 +56,48 @@ class _ScopeVisitor(ast.NodeVisitor):
         for tgt in node.targets:
             for name, line in _iter_assigned_names(tgt):
                 self.assigned.setdefault(name, line)
+            self.visit(tgt)  # picks up loads in `d[k] = ...` / `o.x = ...`
         self.visit(node.value)
 
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
         # x += 1  -> counts as both a load and a store; skip flagging.
         for name, _ in _iter_assigned_names(node.target):
             self.exempt.add(name)
+        self.visit(node.target)
         self.visit(node.value)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         if node.value is not None:
             for name, line in _iter_assigned_names(node.target):
                 self.assigned.setdefault(name, line)
+            self.visit(node.target)
             self.visit(node.value)
 
     def visit_For(self, node: ast.For) -> None:
         for name, _ in _iter_assigned_names(node.target):
             self.exempt.add(name)
+        self.visit(node.target)
         self.visit(node.iter)
         for stmt in node.body:
             self.visit(stmt)
         for stmt in node.orelse:
             self.visit(stmt)
+
+    def visit_With(self, node: ast.With | ast.AsyncWith) -> None:
+        for item in node.items:
+            self.visit(item.context_expr)
+            if item.optional_vars is not None:
+                for name, line in _iter_assigned_names(item.optional_vars):
+                    self.assigned.setdefault(name, line)
+                self.visit(item.optional_vars)
+        for stmt in node.body:
+            self.visit(stmt)
+
+    visit_AsyncWith = visit_With
+
+    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+        self.assigned.setdefault(node.target.id, node.target.lineno)
+        self.visit(node.value)
 
     # --- loads ----------------------------------------------------------
 

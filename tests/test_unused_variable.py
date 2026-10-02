@@ -86,3 +86,30 @@ def f():
     msgs = [f.message for f in findings]
     assert any("'b'" in m for m in msgs)
     assert not any("'a'" in m for m in msgs)
+
+
+def test_subscript_store_counts_as_use():
+    # `d['k'] = 1` reads `d` — it must not be reported as unused.
+    assert _check("def f():\n    d = {}\n    d['k'] = 1\n") == []
+
+
+def test_attribute_store_counts_as_use():
+    assert _check("def f():\n    o = make()\n    o.x = 1\n") == []
+
+
+def test_unused_with_as_target_is_flagged():
+    findings = _check("def f():\n    with open('a') as fh:\n        pass\n")
+    assert [f.message for f in findings] == ["Unused variable 'fh'"]
+
+
+def test_used_with_as_target_is_not_flagged():
+    assert _check("def f():\n    with open('a') as fh:\n        return fh.read()\n") == []
+
+
+def test_unused_walrus_target_is_flagged():
+    findings = _check("def f(xs):\n    if (n := len(xs)):\n        return 1\n")
+    assert [f.message for f in findings] == ["Unused variable 'n'"]
+
+
+def test_used_walrus_target_is_not_flagged():
+    assert _check("def f(xs):\n    if (n := len(xs)) > 1:\n        return n\n") == []

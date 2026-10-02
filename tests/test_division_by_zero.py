@@ -79,3 +79,29 @@ def outer():
     )
     # Only the inner division should be flagged (INFO — z is a parameter there).
     assert len(f) == 1 and f[0].severity == "INFO"
+
+
+def _severities(src: str):
+    return [f.severity for f in _check(src)]
+
+
+def test_augmented_assignment_rebinds_zero_name():
+    # x starts at 0 but `x += 5` changes it, so this is only "possible".
+    assert _severities("def f():\n    x = 0\n    x += 5\n    return 10 / x\n") == ["INFO"]
+
+
+def test_tuple_unpacking_rebinds_zero_name():
+    assert _severities("def f():\n    x = 0\n    x, y = 5, 6\n    return 1 / x\n") == ["INFO"]
+
+
+def test_for_target_rebinds_zero_name():
+    assert _severities("def f(r):\n    x = 0\n    for x in r:\n        pass\n    return 1 / x\n") == ["INFO"]
+
+
+def test_parameter_is_not_provably_zero():
+    assert _severities("def f(c, x=1):\n    if c:\n        x = 0\n    return 1 / x\n") == ["INFO"]
+
+
+def test_nested_function_assignment_does_not_leak_out():
+    # `x = 0` inside g() is g's local; the module-level x is unknown.
+    assert _severities("def g():\n    x = 0\nprint(1 / x)\n") == ["INFO"]
