@@ -72,6 +72,7 @@ class _SqlInjectionVisitor(ast.NodeVisitor):
 
 class SqlInjectionRule(Rule):
     name = "sql-injection"
+    description = "SQL passed to execute() built dynamically instead of parameterized"
 
     def check(self, tree: ast.Module) -> list[Finding]:
         v = _SqlInjectionVisitor()

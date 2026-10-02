@@ -92,6 +92,7 @@ class _SecretsVisitor(ast.NodeVisitor):
 
 class HardcodedSecretsRule(Rule):
     name = "hardcoded-secrets"
+    description = "String literals assigned to credential-shaped names"
 
     def check(self, tree: ast.Module) -> list[Finding]:
         v = _SecretsVisitor()

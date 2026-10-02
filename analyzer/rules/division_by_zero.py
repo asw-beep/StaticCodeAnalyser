@@ -146,6 +146,7 @@ class _DivVisitor(ast.NodeVisitor):
 
 class DivisionByZeroRule(Rule):
     name = "division-by-zero"
+    description = "Division or modulo by zero (definite) or by a non-constant (possible)"
 
     def check(self, tree: ast.Module) -> list[Finding]:
         # Build per-scope sets of "always zero" names. Module + each function.

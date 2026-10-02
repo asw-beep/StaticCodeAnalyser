@@ -15,6 +15,7 @@ from analyzer.reporter import Finding
 
 class Rule(ABC):
     name: str
+    description: str = ""
     severity: str = "WARNING"
 
     @abstractmethod

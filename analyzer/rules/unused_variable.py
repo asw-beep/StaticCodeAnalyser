@@ -187,6 +187,7 @@ def _analyze_scope(body: list[ast.stmt], param_names: set[str]) -> list[Finding]
 
 class UnusedVariableRule(Rule):
     name = "unused-variable"
+    description = "Local names assigned but never read"
 
     def check(self, tree: ast.Module) -> list[Finding]:
         return _analyze_scope(tree.body, set())

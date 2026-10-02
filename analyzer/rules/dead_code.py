@@ -66,6 +66,7 @@ class _DeadCodeVisitor(ast.NodeVisitor):
 
 class DeadCodeRule(Rule):
     name = "dead-code"
+    description = "Statements after return/raise/break/continue in the same block"
 
     def check(self, tree: ast.Module) -> list[Finding]:
         v = _DeadCodeVisitor()

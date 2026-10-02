@@ -109,6 +109,7 @@ class _UnsafeExecVisitor(ast.NodeVisitor):
 
 class UnsafeExecutionRule(Rule):
     name = "unsafe-execution"
+    description = "eval/exec, os.system, shell=True, pickle and unsafe yaml.load"
 
     def check(self, tree: ast.Module) -> list[Finding]:
         v = _UnsafeExecVisitor()

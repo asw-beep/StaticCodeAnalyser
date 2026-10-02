@@ -1,6 +1,6 @@
 # analyzer
 
-A small static analyzer for Python source files. Parses a `.py` file with the standard-library `ast` module, runs a set of rules over the tree, and prints findings.
+A small static analyzer for Python source files. Parses `.py` files with the standard-library `ast` module, runs a set of rules over the tree, and prints findings.
 
 ## Install
 
@@ -18,34 +18,63 @@ pip install -e .
 
 This registers an `analyzer` console script and exposes the package as `python -m analyzer`.
 
-Requires Python 3.10+. No third-party runtime dependencies.
+Requires Python 3.10+. No third-party runtime dependencies on 3.11+ (3.10 needs `tomli` to read config; `pip install` handles it).
 
 ## Usage
 
 ```bash
 analyzer path/to/file.py
+analyzer src/ tests/          # directories are scanned recursively for *.py
+python -m analyzer src/       # without installing
 ```
 
-Or without installing:
-
-```bash
-python -m analyzer path/to/file.py
-```
+A single file prints findings exactly as in the example below. Several files print findings grouped under each file's path, followed by a summary line. A file that fails to parse is reported on stderr and the rest are still analyzed.
 
 ### Options
 
 | Flag | Effect |
 |---|---|
-| `--ast` | Print the first 30 lines of the parsed AST and exit. Quick preview. |
-| `--dump-ast` | Print the full parsed AST and exit. Useful for understanding what the rules are seeing. |
+| `--format text\|json\|sarif` | Output format. `sarif` (2.1.0) can be uploaded to GitHub code scanning. |
+| `--select RULES` | Comma-separated rules to run (default: all). |
+| `--ignore RULES` | Comma-separated rules to skip. |
+| `--min-severity LEVEL` | Hide findings below `INFO`, `WARNING` or `ERROR`. |
+| `--exclude GLOB` | Skip matching files/directories when scanning directories. Repeatable. |
+| `--config PATH` | Read `[tool.analyzer]` from this file instead of discovering one. |
+| `--list-rules` | Print every rule with a one-line description and exit. |
+| `--ast` / `--dump-ast` | Print the first 30 lines / all of one file's parsed AST and exit. |
+
+Unknown rule names in `--select`/`--ignore` or config are an error, not silently ignored.
+
+### Configuration
+
+The nearest `pyproject.toml` at or above the current directory with a `[tool.analyzer]` table is used. Command-line flags override it.
+
+```toml
+[tool.analyzer]
+select = ["unsafe-execution", "sql-injection"]   # default: every rule
+ignore = ["division-by-zero"]
+exclude = ["build", "tests/fixtures/*"]           # globs, matched against names and relative paths
+min-severity = "WARNING"
+```
+
+Hidden directories, `__pycache__`, `venv`/`env`, `build`, `dist`, `node_modules` and `*.egg-info` are always skipped when scanning a directory. A file named explicitly on the command line is always analyzed.
+
+### Suppressing a finding
+
+Add a comment on the line the finding is reported on:
+
+```python
+result = eval(expr)  # analyzer: ignore[unsafe-execution]
+result = eval(expr)  # analyzer: ignore          (every rule on this line)
+```
 
 ### Exit codes
 
 | Code | Meaning |
 |---|---|
-| 0 | No findings (or `--ast`/`--dump-ast` succeeded). |
+| 0 | No findings (or `--ast`/`--dump-ast`/`--list-rules` succeeded). |
 | 1 | One or more findings reported. |
-| 2 | Input error: file missing, not readable, or contains a syntax error. |
+| 2 | Input or usage error: a file missing, unreadable or with a syntax error; invalid config; unknown rule. Takes precedence over 1. |
 
 ## Rules
 
@@ -95,7 +124,8 @@ $ analyzer examples/kitchen_sink.py
 ## Project layout
 
 ```
-analyzer/         package — parser, engine, reporter, rules/
+analyzer/         package — parser, engine, runner, reporter, config,
+                  discovery, suppressions, rules/
 examples/         sample .py files exercising each rule
 tests/            pytest suite
 docs/             one document per build stage; read these to understand
@@ -125,4 +155,4 @@ CI (`.github/workflows/ci.yml`) runs both `ruff check .` and `pytest -q` on ever
 
 ## Status
 
-Phases 1–5 of `Plan.md` are complete (requirements, design, all three Phase-3 rules, integration testing, packaging), plus three additional security-focused rules (`unsafe-execution`, `hardcoded-secrets`, `sql-injection`) and CI automation. Further Phase 6 enhancements (unused imports, shadowed variables, multi-file analysis, severity-filter CLI flags) are not yet implemented.
+Phases 1–5 of `Plan.md` are complete (requirements, design, all three Phase-3 rules, integration testing, packaging), plus three additional security-focused rules (`unsafe-execution`, `hardcoded-secrets`, `sql-injection`) and CI automation. Multi-file analysis, config, inline suppressions, rule/severity filters and JSON/SARIF output are implemented. Further Phase 6 enhancements (unused imports, shadowed variables, infinite loops) are not yet implemented.
