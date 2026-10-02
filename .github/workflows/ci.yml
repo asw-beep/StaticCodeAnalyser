@@ -26,3 +26,6 @@ jobs:
 
       - name: Pytest
         run: pytest -q
+
+      - name: Analyze own source (dogfooding)
+        run: analyzer analyzer tests --min-severity WARNING

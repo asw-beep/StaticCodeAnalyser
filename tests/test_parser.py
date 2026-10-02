@@ -13,6 +13,6 @@ def test_parse_file_returns_module_and_source():
 
 
 def test_dump_tree_is_nonempty_string():
-    tree, source = parse_file(EXAMPLES / "dead_code.py")
+    tree, _ = parse_file(EXAMPLES / "dead_code.py")
     out = dump_tree(tree)
     assert isinstance(out, str) and "FunctionDef" in out

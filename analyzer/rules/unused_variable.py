@@ -13,6 +13,9 @@ Edge cases handled:
 - augmented assignment (`x += 1`) counts as both load and store
 - tuple/starred unpacking targets are each treated as an assignment
 - `with ... as x` and walrus (`x := ...`) targets are assignments
+- class-body assignments are attributes (dataclass fields, constants,
+  method aliases), not locals, and are never flagged; methods inside the
+  class are still checked
 - subscript/attribute targets (`d[k] = v`, `o.x = v`) are a *use* of `d`/`o`,
   not an assignment — they mutate an existing object
 """
@@ -150,7 +153,7 @@ def _params(func: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
     return out
 
 
-def _analyze_scope(body: list[ast.stmt], param_names: set[str]) -> list[Finding]:
+def _analyze_scope(body: list[ast.stmt], param_names: set[str], report: bool = True) -> list[Finding]:
     visitor = _ScopeVisitor()
     for stmt in body:
         visitor.visit(stmt)
@@ -164,7 +167,7 @@ def _analyze_scope(body: list[ast.stmt], param_names: set[str]) -> list[Finding]
 
     findings: list[Finding] = []
     for name, line in visitor.assigned.items():
-        if name in used or name.startswith("_"):
+        if not report or name in used or name.startswith("_"):
             continue
         findings.append(
             Finding(
@@ -180,7 +183,7 @@ def _analyze_scope(body: list[ast.stmt], param_names: set[str]) -> list[Finding]
         if isinstance(nested, (ast.FunctionDef, ast.AsyncFunctionDef)):
             findings.extend(_analyze_scope(nested.body, _params(nested)))
         elif isinstance(nested, ast.ClassDef):
-            findings.extend(_analyze_scope(nested.body, set()))
+            findings.extend(_analyze_scope(nested.body, set(), report=False))
 
     return findings
 

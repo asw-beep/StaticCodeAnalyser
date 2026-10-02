@@ -80,9 +80,9 @@ result = eval(expr)  # analyzer: ignore          (every rule on this line)
 
 | Rule | Severity | Detects |
 |---|---|---|
-| `unused-variable` | WARNING | Names assigned but never read in the same scope. Exempts function parameters, loop variables, names starting with `_`, augmented assignments, and `def`/`class` declarations. Closure references count as use. |
+| `unused-variable` | WARNING | Names assigned but never read in the same scope. Exempts function parameters, loop variables, names starting with `_`, augmented assignments, class attributes, and `def`/`class` declarations. Closure references count as use. |
 | `dead-code` | WARNING | Statements that follow `return`, `raise`, `break`, or `continue` in the same block. Reports only the first dead statement per block. |
-| `division-by-zero` | ERROR / INFO | ERROR for literal-zero divisors (or names provably always-zero in scope). INFO for non-constant divisors (`/`, `//`, `%`). Non-zero numeric literal divisors are silent. |
+| `division-by-zero` | ERROR / INFO | ERROR for literal-zero divisors (or names provably always-zero in scope). INFO for non-constant divisors (`/`, `//`, `%`). Non-zero numeric literal divisors are silent, as are string divisors (`path / "file"`) and `%` string formatting. |
 | `unsafe-execution` | ERROR / WARNING | ERROR for `eval`/`exec`/`compile`, `os.system(...)`, and `subprocess.*(..., shell=True)`. WARNING for `pickle.load`/`pickle.loads` and `yaml.load(...)` without `Loader=yaml.SafeLoader`. |
 | `hardcoded-secrets` | ERROR | Non-empty, non-placeholder string literals assigned to credential-shaped names (`password`, `secret`, `api_key`, `token`, ...) or passed as credential-shaped keyword arguments. |
 | `sql-injection` | ERROR | `.execute(...)`/`.executemany(...)` calls whose SQL argument is built with an f-string, string concatenation, `%` formatting, or `str.format()` instead of a parameterized query. |

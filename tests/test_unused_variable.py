@@ -113,3 +113,22 @@ def test_unused_walrus_target_is_flagged():
 
 def test_used_walrus_target_is_not_flagged():
     assert _check("def f(xs):\n    if (n := len(xs)) > 1:\n        return n\n") == []
+
+
+def test_class_attributes_are_not_flagged():
+    # Class-body assignments define attributes (dataclass fields, constants,
+    # method aliases), which are read via the class — not unused locals.
+    src = (
+        "class C:\n"
+        "    name = 'c'\n"
+        "    size: int = 0\n"
+        "    def visit_A(self):\n"
+        "        return 1\n"
+        "    visit_B = visit_A\n"
+    )
+    assert _check(src) == []
+
+
+def test_unused_local_in_method_is_still_flagged():
+    findings = _check("class C:\n    def m(self):\n        x = 1\n        return 0\n")
+    assert [f.message for f in findings] == ["Unused variable 'x'"]

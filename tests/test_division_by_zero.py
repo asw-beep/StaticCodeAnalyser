@@ -105,3 +105,18 @@ def test_parameter_is_not_provably_zero():
 def test_nested_function_assignment_does_not_leak_out():
     # `x = 0` inside g() is g's local; the module-level x is unknown.
     assert _severities("def g():\n    x = 0\nprint(1 / x)\n") == ["INFO"]
+
+
+def test_string_divisor_is_not_division():
+    # pathlib: `base / "file.txt"` can never be a numeric divide-by-zero.
+    assert _check("def f(base):\n    return base / 'file.txt'\n") == []
+    assert _check("def f(base, n):\n    return base / f'{n}.txt'\n") == []
+
+
+def test_percent_string_formatting_is_not_modulo():
+    assert _check("def f(user):\n    return 'hi %s' % user\n") == []
+    assert _check("def f(user):\n    return f'{user}: %s' % user\n") == []
+
+
+def test_modulo_with_non_string_lhs_is_still_checked():
+    assert _severities("def f(a, b):\n    return a % b\n") == ["INFO"]

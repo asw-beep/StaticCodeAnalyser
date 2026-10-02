@@ -10,6 +10,10 @@ the right operand:
   can't prove it's zero, so it drops to INFO.
 - Anything else (variable, expression, call) -> INFO (possible)
 
+Not division at all, so never reported:
+- a string divisor (`base / "file.txt"` — pathlib joins)
+- `%` with a string on the left (`"hi %s" % name` — printf formatting)
+
 The "possible" tier is deliberately quiet (INFO, not WARNING). Most divisions
 are safe in practice; flagging every one as a warning trains users to ignore
 the analyzer.
@@ -52,6 +56,12 @@ def _walk_scope(body: list[ast.stmt]):
         if isinstance(node, _SCOPE_NODES):
             continue
         stack.extend(ast.iter_child_nodes(node))
+
+
+def _is_str(node: ast.expr) -> bool:
+    return isinstance(node, ast.JoinedStr) or (
+        isinstance(node, ast.Constant) and isinstance(node.value, (str, bytes))
+    )
 
 
 def _collect_constant_zero_names(scope_body: list[ast.stmt], params: set[str]) -> set[str]:
@@ -107,7 +117,8 @@ class _DivVisitor(ast.NodeVisitor):
         self.nested.append(node)
 
     def visit_BinOp(self, node: ast.BinOp) -> None:
-        if isinstance(node.op, _DIV_OPS):
+        is_formatting = isinstance(node.op, ast.Mod) and _is_str(node.left)
+        if isinstance(node.op, _DIV_OPS) and not is_formatting and not _is_str(node.right):
             rhs = node.right
             op = _op_label(node.op)
             if _is_zero_literal(rhs):
