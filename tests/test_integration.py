@@ -33,6 +33,16 @@ def test_dead_code_example(capsys):
     assert rc == 1
     assert "Unreachable code after 'return'" in out
     assert "Unreachable code after 'break'" in out
+    assert "every path through the preceding 'if' exits" in out
+    assert "Unreachable code after infinite loop" in out
+
+
+def test_dead_store_example(capsys):
+    rc, out = _run(EXAMPLES / "dead_store.py", capsys)
+    assert rc == 1
+    assert "Value assigned to 'label' is never read" in out
+    assert "Value assigned to 'count' is never read" in out
+    assert "'result'" not in out
 
 
 def test_division_by_zero_example(capsys):
@@ -47,6 +57,7 @@ def test_kitchen_sink_triggers_all_rules(capsys):
     assert rc == 1
     assert "(unused-variable)" in out
     assert "(dead-code)" in out
+    assert "(dead-store)" in out
     assert "(division-by-zero)" in out
     assert "(unsafe-execution)" in out
     assert "(hardcoded-secrets)" in out

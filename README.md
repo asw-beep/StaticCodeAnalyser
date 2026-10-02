@@ -81,7 +81,8 @@ result = eval(expr)  # analyzer: ignore          (every rule on this line)
 | Rule | Severity | Detects |
 |---|---|---|
 | `unused-variable` | WARNING | Names assigned but never read in the same scope. Exempts function parameters, loop variables, names starting with `_`, augmented assignments, class attributes, and `def`/`class` declarations. Closure references count as use. |
-| `dead-code` | WARNING | Statements that follow `return`, `raise`, `break`, or `continue` in the same block. Reports only the first dead statement per block. |
+| `dead-code` | WARNING | Statements that can never execute, found by reachability on a control-flow graph: after `return`/`raise`/`break`/`continue`/`sys.exit()`, after an `if`/`try`/`match` where every path exits, after `while True` with no `break`, and inside `if False:`. Reports the first statement of each unreachable region. |
+| `dead-store` | WARNING | Assignments inside functions whose value is always overwritten or discarded before being read, found by liveness analysis. Skips default-value initializations (`x = None`, `0`, `[]`, ...), closures, `global`/`nonlocal`, and names never read at all (those are `unused-variable`). |
 | `division-by-zero` | ERROR / INFO | ERROR for literal-zero divisors (or names provably always-zero in scope). INFO for non-constant divisors (`/`, `//`, `%`). Non-zero numeric literal divisors are silent, as are string divisors (`path / "file"`) and `%` string formatting. |
 | `unsafe-execution` | ERROR / WARNING | ERROR for `eval`/`exec`/`compile`, `os.system(...)`, and `subprocess.*(..., shell=True)`. WARNING for `pickle.load`/`pickle.loads` and `yaml.load(...)` without `Loader=yaml.SafeLoader`. |
 | `hardcoded-secrets` | ERROR | Non-empty, non-placeholder string literals assigned to credential-shaped names (`password`, `secret`, `api_key`, `token`, ...) or passed as credential-shaped keyword arguments. |
@@ -119,6 +120,10 @@ $ analyzer examples/kitchen_sink.py
   23 | def query_user(cursor, user_id):
   24 |     cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")  # sql-injection (ERROR)  <-- HERE
   25 |     return API_KEY
+[WARNING] Value assigned to 'y' is never read (overwritten or discarded first) at line 29 (dead-store)
+  28 | def overwrite(x):
+  29 |     y = x * 2                 # dead-store  <-- HERE
+  30 |     y = x * 3
 ```
 
 ## Project layout
@@ -155,4 +160,4 @@ CI (`.github/workflows/ci.yml`) runs both `ruff check .` and `pytest -q` on ever
 
 ## Status
 
-Phases 1–5 of `Plan.md` are complete (requirements, design, all three Phase-3 rules, integration testing, packaging), plus three additional security-focused rules (`unsafe-execution`, `hardcoded-secrets`, `sql-injection`) and CI automation. Multi-file analysis, config, inline suppressions, rule/severity filters and JSON/SARIF output are implemented. Further Phase 6 enhancements (unused imports, shadowed variables, infinite loops) are not yet implemented.
+Phases 1–5 of `Plan.md` are complete (requirements, design, all three Phase-3 rules, integration testing, packaging), plus three additional security-focused rules (`unsafe-execution`, `hardcoded-secrets`, `sql-injection`) and CI automation. Multi-file analysis, config, inline suppressions, rule/severity filters and JSON/SARIF output are implemented, as is an intra-procedural control-flow graph with liveness analysis (`analyzer/cfg.py`, see `docs/07-control-flow-and-liveness.md`) powering `dead-code` and `dead-store`. Further Phase 6 enhancements (unused imports, shadowed variables) are not yet implemented.

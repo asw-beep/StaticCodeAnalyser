@@ -1,4 +1,4 @@
-"""Triggers all six rules in one file — used as a multi-rule integration fixture."""
+"""Triggers every rule in one file — used as a multi-rule integration fixture."""
 
 
 def buggy(x):
@@ -23,3 +23,9 @@ API_KEY = "sk-live-abc123def456"  # hardcoded-secrets (ERROR)
 def query_user(cursor, user_id):
     cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")  # sql-injection (ERROR)
     return API_KEY
+
+
+def overwrite(x):
+    y = x * 2                 # dead-store
+    y = x * 3
+    return y

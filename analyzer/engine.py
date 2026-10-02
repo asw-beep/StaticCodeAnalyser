@@ -7,6 +7,7 @@ import ast
 from analyzer.reporter import Finding
 from analyzer.rules.base import Rule
 from analyzer.rules.dead_code import DeadCodeRule
+from analyzer.rules.dead_store import DeadStoreRule
 from analyzer.rules.division_by_zero import DivisionByZeroRule
 from analyzer.rules.hardcoded_secrets import HardcodedSecretsRule
 from analyzer.rules.sql_injection import SqlInjectionRule
@@ -18,6 +19,7 @@ def default_rules() -> list[Rule]:
     return [
         UnusedVariableRule(),
         DeadCodeRule(),
+        DeadStoreRule(),
         DivisionByZeroRule(),
         UnsafeExecutionRule(),
         HardcodedSecretsRule(),
