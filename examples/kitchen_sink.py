@@ -29,3 +29,8 @@ def overwrite(x):
     y = x * 2                 # dead-store
     y = x * 3
     return y
+
+
+def lookup(cursor):
+    name = input("name: ")
+    cursor.execute("SELECT * FROM users WHERE name = '" + name + "'")  # sql-injection + tainted-data

@@ -11,6 +11,7 @@ from analyzer.rules.dead_store import DeadStoreRule
 from analyzer.rules.division_by_zero import DivisionByZeroRule
 from analyzer.rules.hardcoded_secrets import HardcodedSecretsRule
 from analyzer.rules.sql_injection import SqlInjectionRule
+from analyzer.rules.tainted_data import TaintedDataRule
 from analyzer.rules.unsafe_execution import UnsafeExecutionRule
 from analyzer.rules.unused_variable import UnusedVariableRule
 
@@ -24,6 +25,7 @@ def default_rules() -> list[Rule]:
         UnsafeExecutionRule(),
         HardcodedSecretsRule(),
         SqlInjectionRule(),
+        TaintedDataRule(),
     ]
 
 

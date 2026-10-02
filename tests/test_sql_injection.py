@@ -55,3 +55,55 @@ def test_unrelated_call_is_not_flagged():
 def test_no_execute_calls_no_findings():
     f = _check("def f(a, b):\n    return a + b\n")
     assert f == []
+
+
+# --- traced through variables (dataflow) --------------------------------------
+
+
+def _lines(src: str) -> list[int]:
+    return [f.line for f in _check(src)]
+
+
+def test_query_built_earlier_with_concat_is_error():
+    f = _check("def f(c, uid):\n    q = 'SELECT * FROM u WHERE id = ' + uid\n    c.execute(q)\n")
+    assert len(f) == 1 and f[0].line == 3
+    assert "string concatenation (line 2)" in f[0].message
+
+
+def test_query_extended_with_augmented_concat_is_error():
+    src = "def f(c, uid):\n    q = 'SELECT * FROM u WHERE id = '\n    q += uid\n    c.execute(q)\n"
+    assert _lines(src) == [4]
+
+
+def test_query_dynamic_on_one_branch_is_error():
+    src = "def f(c, uid, x):\n    q = 'SELECT 1'\n    if x:\n        q = 'SELECT ' + uid\n    c.execute(q)\n"
+    assert _lines(src) == [5]
+
+
+def test_query_built_in_loop_is_error():
+    src = (
+        "def f(c, ids):\n    q = 'SELECT * FROM t WHERE id IN ('\n"
+        "    for i in ids:\n        q += str(i) + ','\n    c.execute(q)\n"
+    )
+    assert _lines(src) == [5]
+
+
+def test_parameterized_query_built_from_literals_is_safe():
+    src = (
+        "def f(c, a, b):\n    q = 'SELECT * FROM u WHERE a = ?'\n"
+        "    q += ' AND b = ?'\n    c.execute(q, (a, b))\n"
+    )
+    assert _lines(src) == []
+
+
+def test_query_from_static_variables_is_safe():
+    src = "def f(c):\n    base = 'SELECT * FROM u'\n    q = base + ' WHERE a = ?'\n    c.execute(q, (1,))\n"
+    assert _lines(src) == []
+
+
+def test_reassigned_to_literal_is_safe():
+    assert _lines("def f(c, uid):\n    q = 'SELECT ' + uid\n    q = 'SELECT 1'\n    c.execute(q)\n") == []
+
+
+def test_numeric_addition_is_not_string_building():
+    assert _lines("def f(c, a, b):\n    n = a + b\n    c.execute(n)\n") == []

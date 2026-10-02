@@ -4,7 +4,7 @@ def get_user_fstring(cursor, user_id):
 
 def get_user_concat(cursor, user_id):
     query = "SELECT * FROM users WHERE id = " + user_id
-    cursor.execute(query)  # not flagged: query built earlier, not at the call site
+    cursor.execute(query)  # sql-injection (ERROR): traced back to line 6
 
 
 def get_user_inline_concat(cursor, user_id):

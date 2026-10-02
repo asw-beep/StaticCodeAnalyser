@@ -37,6 +37,22 @@ def test_dead_code_example(capsys):
     assert "Unreachable code after infinite loop" in out
 
 
+def test_sql_injection_example_traces_query_variable(capsys):
+    rc, out = _run(EXAMPLES / "sql_injection.py", capsys)
+    assert rc == 1
+    assert "string concatenation (line 6)" in out
+
+
+def test_tainted_data_example(capsys):
+    rc, out = _run(EXAMPLES / "tainted_data.py", capsys)
+    tainted = [ln for ln in out.splitlines() if ln.endswith("(tainted-data)")]
+    assert rc == 1
+    assert len(tainted) == 3
+    assert any("request.args (line 12)" in ln and "command injection" in ln for ln in tainted)
+    assert any("route parameter 'name'" in ln and "path traversal" in ln for ln in tainted)
+    assert any("sys.argv (line 34)" in ln and "code injection" in ln for ln in tainted)
+
+
 def test_dead_store_example(capsys):
     rc, out = _run(EXAMPLES / "dead_store.py", capsys)
     assert rc == 1
@@ -62,6 +78,7 @@ def test_kitchen_sink_triggers_all_rules(capsys):
     assert "(unsafe-execution)" in out
     assert "(hardcoded-secrets)" in out
     assert "(sql-injection)" in out
+    assert "(tainted-data)" in out
 
 
 def test_findings_sorted_by_line(capsys):

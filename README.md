@@ -86,7 +86,8 @@ result = eval(expr)  # analyzer: ignore          (every rule on this line)
 | `division-by-zero` | ERROR / INFO | ERROR for literal-zero divisors (or names provably always-zero in scope). INFO for non-constant divisors (`/`, `//`, `%`). Non-zero numeric literal divisors are silent, as are string divisors (`path / "file"`) and `%` string formatting. |
 | `unsafe-execution` | ERROR / WARNING | ERROR for `eval`/`exec`/`compile`, `os.system(...)`, and `subprocess.*(..., shell=True)`. WARNING for `pickle.load`/`pickle.loads` and `yaml.load(...)` without `Loader=yaml.SafeLoader`. |
 | `hardcoded-secrets` | ERROR | Non-empty, non-placeholder string literals assigned to credential-shaped names (`password`, `secret`, `api_key`, `token`, ...) or passed as credential-shaped keyword arguments. |
-| `sql-injection` | ERROR | `.execute(...)`/`.executemany(...)` calls whose SQL argument is built with an f-string, string concatenation, `%` formatting, or `str.format()` instead of a parameterized query. |
+| `sql-injection` | ERROR | `.execute(...)`/`.executemany(...)` calls whose SQL argument is built with an f-string, string concatenation, `%` formatting, `str.format()` or `str.join()` instead of a parameterized query — inline, or earlier in the function and passed through variables (the message cites the line it was built on). Queries assembled from string literals only (`q += " AND b = ?"`) are not flagged. |
+| `tainted-data` | ERROR | Untrusted input reaching a dangerous call, tracked through variables. Sources: `input()`, `sys.argv`, `sys.stdin`, web `request.*` data, route-handler parameters. Sinks: SQL `execute`, shell commands, `eval`/`exec`, file paths, outbound URLs (SSRF), deserialization. Sanitizers such as `int()`, `shlex.quote()`, `os.path.basename()` clear taint. |
 
 ## Example
 
@@ -124,6 +125,12 @@ $ analyzer examples/kitchen_sink.py
   28 | def overwrite(x):
   29 |     y = x * 2                 # dead-store  <-- HERE
   30 |     y = x * 3
+[ERROR] SQL query built with string concatenation instead of a parameterized query in 'execute()' at line 36 (sql-injection)
+  35 |     name = input("name: ")
+  36 |     cursor.execute("SELECT * FROM users WHERE name = '" + name + "'")  # sql-injection + tainted-data  <-- HERE
+[ERROR] Untrusted input from input() (line 35) reaches 'execute()': possible SQL injection at line 36 (tainted-data)
+  35 |     name = input("name: ")
+  36 |     cursor.execute("SELECT * FROM users WHERE name = '" + name + "'")  # sql-injection + tainted-data  <-- HERE
 ```
 
 ## Project layout
@@ -160,4 +167,4 @@ CI (`.github/workflows/ci.yml`) runs both `ruff check .` and `pytest -q` on ever
 
 ## Status
 
-Phases 1–5 of `Plan.md` are complete (requirements, design, all three Phase-3 rules, integration testing, packaging), plus three additional security-focused rules (`unsafe-execution`, `hardcoded-secrets`, `sql-injection`) and CI automation. Multi-file analysis, config, inline suppressions, rule/severity filters and JSON/SARIF output are implemented, as is an intra-procedural control-flow graph with liveness analysis (`analyzer/cfg.py`, see `docs/07-control-flow-and-liveness.md`) powering `dead-code` and `dead-store`. Further Phase 6 enhancements (unused imports, shadowed variables) are not yet implemented.
+Phases 1–5 of `Plan.md` are complete (requirements, design, all three Phase-3 rules, integration testing, packaging), plus three additional security-focused rules (`unsafe-execution`, `hardcoded-secrets`, `sql-injection`) and CI automation. Multi-file analysis, config, inline suppressions, rule/severity filters and JSON/SARIF output are implemented, as is an intra-procedural control-flow graph with liveness analysis (`analyzer/cfg.py`, see `docs/07-control-flow-and-liveness.md`) powering `dead-code` and `dead-store`, and a forward dataflow engine (`analyzer/dataflow.py`, see `docs/08-dataflow-and-taint.md`) powering variable tracing in `sql-injection` and source-to-sink tracking in `tainted-data`. Further Phase 6 enhancements (unused imports, shadowed variables) are not yet implemented.
